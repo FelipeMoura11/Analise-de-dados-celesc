@@ -1,59 +1,53 @@
 import os
-import csv
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
-# Configuração da pasta de saída
+# Arquivos
+ARQUIVO_EXISTENTE = r'C:\Users\User2025\Desktop\CASE\Excel\Case_Nome_Sobrenome.xlsx'
 PASTA_SAIDA = r'C:\Users\User2025\Desktop\CASE\output'
-ARQUIVO_SAIDA = os.path.join(PASTA_SAIDA, 'aviso_acionistas.csv')
+ARQUIVO_SAIDA = os.path.join(PASTA_SAIDA, 'Case_Nome_Sobrenome_Preenchido.xlsx')
+ARQUIVO_DADOS = os.path.join(PASTA_SAIDA, 'receita_liquida.csv')
 
-# Garantir que a pasta existe
-if not os.path.exists(PASTA_SAIDA):
-    os.makedirs(PASTA_SAIDA)
+def periodo_para_chave(periodo):
+    """
+    Converte o período (ex: '1T25') para uma chave numérica
+    que permite ordenar os dados cronologicamente.
+    """
+    try:
+        trimestre = int(periodo[0])
+        ano = int(periodo[2:])  # pega o ano depois do 'T'
+        return (ano, trimestre)
+    except Exception as e:
+        return (9999, 99)  # em caso de erro, manda para o fim
 
-options = webdriver.ChromeOptions()
-options.add_argument('--headless')
-options.add_argument('--disable-gpu')
+def preencher_planilha_receita(arquivo_dados, arquivo_existente, arquivo_saida):
+    # Lê os dados extraídos
+    df = pd.read_csv(arquivo_dados)
+    df = df[['Conta', 'Valor', 'Período']]
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+    # Ordena cronologicamente
+    df['chave_ordem'] = df['Período'].apply(periodo_para_chave)
+    df = df.sort_values(by='chave_ordem').drop(columns=['chave_ordem'])
 
-try:
-    url = 'https://ri.celesc.com.br/comunicados-e-atas/aviso-aos-acionistas/'
-    driver.get(url)
+    # Abre a planilha existente
+    wb = load_workbook(arquivo_existente)
+    ws = wb['Database']
 
-    wait = WebDriverWait(driver, 20)
-    wait.until(EC.presence_of_element_located((By.ID, 'tabela_1')))
-    wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="tabela_1"]/tr[1]')))
+    start_row = 4  # começa a preencher na linha 4
+    start_col = 2  # coluna B
 
-    rows = driver.find_elements(By.XPATH, '//*[@id="tabela_1"]/tr')
-    data_list = []
+    print(f"➡️ Preenchendo planilha com {len(df)} registros...")
 
-    for row in rows:
-        cols = row.find_elements(By.TAG_NAME, 'td')
-        if len(cols) >= 2:
-            data = cols[0].text.strip()
-            try:
-                title_elem = cols[1].find_element(By.TAG_NAME, 'a')
-                title = title_elem.text.strip()
-                link = title_elem.get_attribute('href')
-            except:
-                title = 'Aviso aos Acionistas - Documento'
-                link = ''
+    for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=False), start=start_row):
+        for c_idx, value in enumerate(row, start=start_col):
+            ws.cell(row=r_idx, column=c_idx, value=value)
 
-            data_list.append([data, title, link])
+    if not os.path.exists(PASTA_SAIDA):
+        os.makedirs(PASTA_SAIDA)
 
-    # Salvando na pasta de saída
-    with open(ARQUIVO_SAIDA, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Data', 'Título', 'Link'])
-        writer.writerows(data_list)
+    wb.save(arquivo_saida)
+    print(f"✅ Planilha preenchida e salva como: {arquivo_saida}")
 
-    print(f"✅ Extração concluída! {len(data_list)} registros salvos em {ARQUIVO_SAIDA}")
-
-finally:
-    driver.quit()
+if __name__ == '__main__':
+    preencher_planilha_receita(ARQUIVO_DADOS, ARQUIVO_EXISTENTE, ARQUIVO_SAIDA)
