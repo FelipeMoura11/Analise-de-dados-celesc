@@ -1,6 +1,6 @@
 # 📊 Case Celesc — Análise Automatizada de Demonstrações Financeiras
 
-Este projeto foi desenvolvido como o objetivo de automatizar a extração e organização de dados financeiros da empresa **Celesc**, além de realizar análises complementares e coleta de informações públicas via **WebScraping**.
+Este projeto foi desenvolvido com o objetivo de automatizar a extração e organização de dados financeiros da empresa **Celesc**, além de realizar análises complementares e coleta de informações públicas via **WebScraping**.
 
 ---
 
